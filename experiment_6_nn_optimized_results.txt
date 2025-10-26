@@ -1,0 +1,18 @@
+=== Experiment 6: NN Optimization Results ===Dataset samples: 14884Train/Test Split: 11907/2977Test Accuracy: 0.4085Classification Report:              precision    recall  f1-score   support
+
+       angry       0.54      0.72      0.62       509
+     disgust       0.31      0.33      0.32       508
+     fearful       0.30      0.04      0.06       508
+       happy       0.36      0.33      0.34       509
+     neutral       0.36      0.32      0.34       435
+         sad       0.42      0.71      0.53       508
+
+    accuracy                           0.41      2977
+   macro avg       0.38      0.41      0.37      2977
+weighted avg       0.38      0.41      0.37      2977
+Confusion Matrix:[[365  45   6  73  14   6]
+ [ 57 168   7  61  60 155]
+ [100  72  18  82  59 177]
+ [136  73  13 167  73  47]
+ [ 10 101   3  73 138 110]
+ [  4  81  14  13  36 360]]

@@ -1,0 +1,1 @@
+=== Experiment 5: Linear Regression with Mini-Batch SGD Results ===Dataset: 7442 samples, 10 featuresTrain/Test Split: 5953/1489Test MSE: 1.9920Test R^2 Score: 0.3166

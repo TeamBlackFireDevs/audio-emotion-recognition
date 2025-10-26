@@ -1,0 +1,245 @@
+# Experiment 12: LSTM for Sequence Labeling of Audio Frames (NER Style)
+# Multi-Modal Emotion Recognition Project
+
+import os
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+import librosa
+import glob
+import matplotlib.pyplot as plt
+
+# -----------------------------
+# Configuration
+# -----------------------------
+DATASET_DIR = "cremad_dataset"  # Update your path here
+TARGET_SR = 16000
+DURATION_SEC = 3.0
+N_MFCC = 40
+SEED = 42
+BATCH_SIZE = 16
+EPOCHS = 25
+LEARNING_RATE = 0.001
+MAX_SEQ_LEN = 188  # Fixed length of frames
+EMOTIONS = ['angry', 'disgust', 'fearful', 'happy', 'neutral', 'sad']
+torch.manual_seed(SEED)
+np.random.seed(SEED)
+
+# -----------------------------
+# Data Preparation
+# -----------------------------
+def parse_cremad_label(filename):
+    parts = filename.split('.')[0].split('_')
+    if len(parts) >= 3:
+        mapping = {
+            'ANG': 'angry', 'DIS': 'disgust', 'FEA': 'fearful', 'FEAR': 'fearful',
+            'HAP': 'happy', 'NEU': 'neutral', 'SAD': 'sad'
+        }
+        return mapping.get(parts[2].upper(), None)
+    return None
+
+def load_audio_fixed(path, target_sr=TARGET_SR):
+    y, _ = librosa.load(path, sr=target_sr, duration=DURATION_SEC)
+    target_len = int(target_sr * DURATION_SEC)
+    if len(y) < target_len:
+        y = np.pad(y, (0, target_len - len(y)), 'constant')
+    else:
+        y = y[:target_len]
+    return y
+
+def extract_mfcc_seq(y, sr=TARGET_SR, n_mfcc=N_MFCC, hop_length=256):
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc, hop_length=hop_length)
+    mfcc = mfcc.T  # Shape: (frames, n_mfcc)
+    return mfcc
+
+# Label encoder: fixed classes to match EMOTIONS order
+label_encoder = LabelEncoder()
+label_encoder.fit(EMOTIONS)
+
+class AudioSeqDataset(Dataset):
+    def __init__(self, file_paths, labels):
+        self.file_paths = file_paths
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.file_paths)
+
+    def __getitem__(self, idx):
+        y = load_audio_fixed(self.file_paths[idx])
+        mfcc_seq = extract_mfcc_seq(y)
+        label = self.labels[idx]
+        label_id = label_encoder.transform([label])[0]
+
+        seq_len = min(len(mfcc_seq), MAX_SEQ_LEN)
+        mfcc_seq = mfcc_seq[:seq_len]
+
+        # Pad sequence if shorter than MAX_SEQ_LEN
+        if seq_len < MAX_SEQ_LEN:
+            pad_width = ((0, MAX_SEQ_LEN - seq_len), (0, 0))
+            mfcc_seq = np.pad(mfcc_seq, pad_width, mode='constant')
+
+        # Repeat label for all frames (frame-level labels)
+        frame_labels = np.full((MAX_SEQ_LEN,), label_id)
+        return torch.tensor(mfcc_seq, dtype=torch.float32), torch.tensor(frame_labels, dtype=torch.long)
+
+def load_dataset():
+    file_paths, labels = [], []
+    for f in glob.glob(os.path.join(DATASET_DIR, '**', '*.wav'), recursive=True):
+        emo = parse_cremad_label(os.path.basename(f))
+        if emo in EMOTIONS:
+            file_paths.append(f)
+            labels.append(emo)
+    return file_paths, labels
+
+# -----------------------------
+# LSTM Model
+# -----------------------------
+class LSTMFrameClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size, num_classes):
+        super(LSTMFrameClassifier, self).__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True, bidirectional=True)
+        self.fc = nn.Linear(hidden_size * 2, num_classes)
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        out = self.fc(out)
+        return out
+
+# -----------------------------
+# Training and evaluation
+# -----------------------------
+def train(model, dataloader, criterion, optimizer, device):
+    model.train()
+    total_loss = 0.0
+    for x, y in dataloader:
+        x = x.to(device, non_blocking=True)
+        y = y.to(device, non_blocking=True)
+        optimizer.zero_grad()
+        outputs = model(x)
+        loss = criterion(outputs.view(-1, outputs.shape[-1]), y.view(-1))
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    return total_loss / len(dataloader)
+
+def evaluate(model, dataloader, device):
+    model.eval()
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for x, y in dataloader:
+            x = x.to(device, non_blocking=True)
+            y = y.to(device, non_blocking=True)
+            outputs = model(x)
+            preds = outputs.argmax(dim=-1)
+            all_preds.append(preds.cpu().numpy().flatten())
+            all_labels.append(y.cpu().numpy().flatten())
+    all_preds = np.concatenate(all_preds)
+    all_labels = np.concatenate(all_labels)
+    accuracy = accuracy_score(all_labels, all_preds)
+    return accuracy, all_labels, all_preds
+
+# -----------------------------
+# Main
+# -----------------------------
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+torch.backends.cudnn.benchmark = True
+
+def main():
+    print("=== Experiment 12: LSTM Sequence Labeling for Audio Frame Emotion Recognition ===")
+    file_paths, labels = load_dataset()
+
+    X_train_paths, X_test_paths, y_train, y_test = train_test_split(
+        file_paths, labels, test_size=0.2, random_state=SEED, stratify=labels
+    )
+
+    train_dataset = AudioSeqDataset(X_train_paths, y_train)
+    test_dataset = AudioSeqDataset(X_test_paths, y_test)
+
+    train_loader = DataLoader(
+        train_dataset, batch_size=BATCH_SIZE, shuffle=True,
+        pin_memory=(DEVICE.type == "cuda")
+    )
+    test_loader = DataLoader(
+        test_dataset, batch_size=BATCH_SIZE, shuffle=False,
+        pin_memory=(DEVICE.type == "cuda")
+    )
+
+    model = LSTMFrameClassifier(input_size=N_MFCC, hidden_size=64, num_classes=len(EMOTIONS)).to(DEVICE)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+
+    # Track metrics for plotting
+    train_losses = []
+    val_accuracies = []
+
+    for epoch in range(EPOCHS):
+        train_loss = train(model, train_loader, criterion, optimizer, DEVICE)
+        val_acc, _, _ = evaluate(model, test_loader, DEVICE)
+        train_losses.append(train_loss)
+        val_accuracies.append(val_acc)
+        print(f"Epoch {epoch+1}/{EPOCHS}, Train Loss: {train_loss:.4f}, Validation Accuracy: {val_acc:.4f}")
+
+    # Final eval and report
+    val_acc, y_true, y_pred = evaluate(model, test_loader, DEVICE)
+    print("\nClassification Report:")
+    print(classification_report(y_true, y_pred, target_names=EMOTIONS, zero_division=0))
+
+    # -----------------------------
+    # Plots: Loss and Accuracy
+    # -----------------------------
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 2, 1)
+    plt.plot(range(1, EPOCHS + 1), train_losses, label='Train Loss', color='tab:blue')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss over Epochs')
+    plt.grid(True)
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(range(1, EPOCHS + 1), val_accuracies, label='Validation Accuracy', color='tab:green')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Validation Accuracy over Epochs')
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig('experiment_12_lstm_metrics.png', dpi=300)
+    plt.show()
+
+    # -----------------------------
+    # Optional: Confusion Matrix Heatmap
+    # -----------------------------
+    cm = confusion_matrix(y_true, y_pred, labels=list(range(len(EMOTIONS))))
+    fig, ax = plt.subplots(figsize=(6, 5))
+    im = ax.imshow(cm, interpolation='nearest', cmap='Blues')
+    ax.figure.colorbar(im, ax=ax)
+    ax.set(
+        xticks=np.arange(len(EMOTIONS)),
+        yticks=np.arange(len(EMOTIONS)),
+        xticklabels=EMOTIONS, yticklabels=EMOTIONS,
+        ylabel='True label', xlabel='Predicted label',
+        title='Confusion Matrix (Frame-level)'
+    )
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+
+    # Annotate cells
+    thresh = cm.max() / 2.0 if cm.size > 0 else 0.0
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            ax.text(j, i, format(cm[i, j], 'd'),
+                    ha="center", va="center",
+                    color="white" if cm[i, j] > thresh else "black")
+    fig.tight_layout()
+    plt.savefig('experiment_12_lstm_confusion_matrix.png', dpi=300)
+    plt.show()
+
+    print("\nTraining completed. Plots saved as 'experiment_12_lstm_metrics.png' and 'experiment_12_lstm_confusion_matrix.png'.")
+
+if __name__ == "__main__":
+    main()

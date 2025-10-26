@@ -1,0 +1,2 @@
+=== Experiment 2: Sigmoid Neuron Results ===Dataset: 7442 samples, 10 featuresTrain/Test Split: 5953/1489Test Accuracy: 0.6985Test ROC-AUC: 0.6662Confusion Matrix: [[959  58]
+ [391  81]]

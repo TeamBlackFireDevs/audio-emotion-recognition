@@ -1,0 +1,18 @@
+=== Experiment 3: FFN Multi-class Classification Results ===Dataset: 7442 samples, 10 featuresTrain/Test Split: 5953/1489Test Accuracy: 0.4513Classification Report:              precision    recall  f1-score   support
+
+       angry       0.59      0.69      0.64       254
+     disgust       0.42      0.35      0.38       254
+     fearful       0.42      0.16      0.23       254
+       happy       0.37      0.33      0.35       255
+     neutral       0.33      0.50      0.40       218
+         sad       0.53      0.69      0.59       254
+
+    accuracy                           0.45      1489
+   macro avg       0.44      0.45      0.43      1489
+weighted avg       0.45      0.45      0.43      1489
+Confusion Matrix:[[174  22   5  37  12   4]
+ [ 25  89   9  35  51  45]
+ [ 38  21  41  39  54  61]
+ [ 53  23  17  84  64  14]
+ [  1  33  13  28 110  33]
+ [  3  25  12   2  38 174]]

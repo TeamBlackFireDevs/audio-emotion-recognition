@@ -1,0 +1,1 @@
+=== Experiment 7: Skip-Gram Audio Embedding Results ===Total training pairs: 2753540Final Training Loss (MSE): 90.1935Final Validation Loss (MSE): 110.1142

@@ -1,0 +1,1 @@
+=== Experiment 4: Linear Regression with SGD Results ===Dataset: 7442 samples, 10 featuresTrain/Test Split: 5953/1489Test MSE: 2.0251Test R^2 Score: 0.3052

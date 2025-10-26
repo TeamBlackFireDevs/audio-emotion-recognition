@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Emotion Detection</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <i class="fas fa-brain header-icon"></i>
+                <h1>Audio Emotion Detection</h1>
+                <p>Upload an audio file to analyze emotional content using AI</p>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-content">
+                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                        <h3>Drop your audio file here</h3>
+                        <p>or <span class="browse-text">browse files</span></p>
+                        <p class="file-info">Supports WAV, MP3, M4A, FLAC (Max 16MB)</p>
+                    </div>
+                    <input type="file" id="audioFile" accept=".wav,.mp3,.m4a,.flac" hidden>
+                </div>
+                
+                <div class="file-preview" id="filePreview" style="display: none;">
+                    <div class="file-info-display">
+                        <i class="fas fa-music"></i>
+                        <span id="fileName"></span>
+                        <button class="remove-file" id="removeFile">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <audio controls id="audioPlayer" style="width: 100%; margin-top: 10px;"></audio>
+                </div>
+
+                <button class="analyze-btn" id="analyzeBtn" disabled>
+                    <i class="fas fa-chart-line"></i>
+                    Analyze Emotion
+                </button>
+            </div>
+
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Analyzing audio emotions...</p>
+            </div>
+
+            <div class="transcript-section" id="transcriptSection" style="display: none;">
+                <h2><i class="fas fa-quote-left"></i> Speech Transcript</h2>
+                <div class="transcript-content">
+                    <div class="transcript-text" id="transcriptText"></div>
+                </div>
+            </div>
+
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <h2><i class="fas fa-chart-bar"></i> Emotion Analysis Results</h2>
+                <div class="emotion-grid" id="emotionGrid">
+                    <!-- Results will be populated here -->
+                </div>
+                <button class="new-analysis-btn" id="newAnalysisBtn">
+                    <i class="fas fa-plus"></i>
+                    Analyze Another File
+                </button>
+            </div>
+
+            <div class="error-message" id="errorMessage" style="display: none;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span id="errorText"></span>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2024 Audio Emotion Detection System</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
